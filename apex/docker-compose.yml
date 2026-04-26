@@ -1,0 +1,109 @@
+version: "3.9"
+
+# Local development stack for Apex.
+# Services mirror production closely enough to catch integration bugs early.
+# Run with: docker compose up -d
+
+services:
+
+  # ─── Application ───────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: deployments/docker/Dockerfile
+      target: development           # multi-stage: hot reload in dev
+    ports:
+      - "8080:8080"                 # API
+      - "2345:2345"                 # Delve debugger port
+    environment:
+      APP_ENV: development
+      PORT: 8080
+      DATABASE_URL: postgres://apex:apex_dev_password@postgres:5432/apex_dev?sslmode=disable
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: dev-only-jwt-secret-change-in-production-32chars
+      LOG_LEVEL: debug
+    volumes:
+      - .:/app                      # mount source for live reload
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ─── PostgreSQL + TimescaleDB ───────────────────────────────────────────────
+  postgres:
+    image: timescale/timescaledb:latest-pg16
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: apex
+      POSTGRES_PASSWORD: apex_dev_password
+      POSTGRES_DB: apex_dev
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Init scripts run in alphabetical order on first boot
+      - ./scripts/db-init.sh:/docker-entrypoint-initdb.d/init.sh
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U apex -d apex_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  # ─── Redis (rate limiting + pub/sub) ─────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --save ""
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # ─── Frontend (Next.js dashboard) ──────────────────────────────────────────
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8080
+      NEXT_PUBLIC_WS_URL: ws://localhost:8080
+    volumes:
+      - ./dashboard:/app
+      - /app/node_modules           # don't mount host node_modules
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  # ─── Grafana (local observability, optional) ────────────────────────────
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: dev
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./deployments/grafana/dashboards:/etc/grafana/provisioning/dashboards
+    profiles:
+      - monitoring               # only start with: docker compose --profile monitoring up
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  grafana_data:
+
+networks:
+  default:
+    name: apex_dev
