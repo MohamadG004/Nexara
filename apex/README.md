@@ -2,10 +2,6 @@
 
 > **Production-quality portfolio project** · Go · TypeScript · PostgreSQL/TimescaleDB · Redis · Docker
 
-[![CI](https://github.com/yourusername/apex/actions/workflows/ci.yml/badge.svg)](https://github.com/yourusername/apex/actions)
-[![Go Report Card](https://goreportcard.com/badge/github.com/yourusername/apex)](https://goreportcard.com/report/github.com/yourusername/apex)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
 ---
 
 ## What Is Apex?
