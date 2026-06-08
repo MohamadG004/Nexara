@@ -1,6 +1,6 @@
-# Apex — Real-time API Observability & Analytics Platform
+# Apex - Real-time API Observability & Analytics Platform
 
-> **Production-quality portfolio project** · Go · TypeScript · PostgreSQL/TimescaleDB · Redis · Docker
+> Go · TypeScript · PostgreSQL/TimescaleDB · Redis · Docker
 
 ---
 
